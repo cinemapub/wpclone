@@ -115,7 +115,7 @@ read_wpconfig(){
 read_sqldump(){
 	# $1 = name parameter
 	# $2 = sql ndump file
-	# INSERT INTO `tpl_options` VALUES (2, 'home', 'http://events.brightfish.be/_template', 'yes'); 
+	# INSERT INTO `tpl_options` VALUES (2, 'home', 'http://www.example.com/_template', 'yes'); 
 
 	VALUE=""
 	if [ ! -f "$2" ] ; then
@@ -221,16 +221,17 @@ main() {
 	fi
 	unzip -q "$bck_zip" -d "$new_dir"
 	WPCFG=$(find "$new_dir" -name wp-config.php)
-
+	old_subdir="_template"
 	if [ -n "$WPCFG" ] ; then
 		WPDIR=$(dirname $WPCFG)
 		if [ "$WPDIR" == "$new_dir" ] ; then
 			# nothing to do
-			NOTHING=nothing
+			echo "Dest: $new_dir" >> $MAILTXT
 		else 
 			# move from ./<folder>/wp-... to current folder
 			out "move content from [$WPDIR] to [$new_dir]"
 			echo "Move: $WPDIR > $new_dir" >> $MAILTXT
+			old_subdir=$(basename $WPDIR)
 			mv "$WPDIR"/* "$new_dir/"
 		fi
 	else
@@ -276,6 +277,7 @@ main() {
 	
 	old_url=$siteurl
 	esc_url=$(escape $old_url)
+	esc_subdir=$(escape /$old_subdir)
 	out "OLD URL: [$old_url]"
 	out "ESCAPED: [$esc_url]"
 	old_root=$(dirname $old_url)
@@ -289,13 +291,14 @@ main() {
 		gsub(/$old_title/,\"$new_title\");
 		gsub(/$old_sub/,\"$new_sub\");
 		gsub(/$esc_url/,\"$new_url\");
+		gsub(/$esc_subdir/,\"/_$new_subdir\");
 		gsub(/%TODAY%/,\"$TODAY\");
 		print;
 		}" > $new_sql
 	USERLINE=$(grep $new_pre"users" $new_sql | grep INSERT | head -1)
 	USERNAME=$(echo "$USERLINE" | cut -d',' -f2 | sed 's/[^a-zA-Z\.@\-\_]//g')
 	USERMAIL=$(echo "$USERLINE" | cut -d',' -f5 | sed 's/[^a-zA-Z\.@\-\_]//g')
-	#INSERT INTO `joa_users` VALUES (1, 'bfevent', '<pwhash>', 'bfevent', 'p.forret@brightfish.be', 'http://www.brightfish.be', '2016-08-10 08:08:10', '', 0, 'bfevent');
+	#INSERT INTO `joa_users` VALUES (1, 'admin', '<pwhash>', 'admin', 'test@example.com', 'http://www.example.com', '2016-08-10 08:08:10', '', 0, 'admin');
 	echo "Admin:    $new_url/wp-admin" >> $MAILTXT
 	echo "Username: $USERNAME" >> $MAILTXT
 	echo "Password: same as template WP" >> $MAILTXT
@@ -303,12 +306,6 @@ main() {
 	
 	echo "Password : $DB_PASSWORD"
 	echo "Next step: mysql -h $DB_HOST -u $DB_USER -p $DB_NAME < $new_sql"
-	# INSERT INTO `tpl_options` VALUES (1, 'siteurl', 'http://events.brightfish.be/_template', 'yes'); 
-	# INSERT INTO `tpl_options` VALUES (2, 'home', 'http://events.brightfish.be/_template', 'yes'); 
-	# INSERT INTO `tpl_options` VALUES (3, 'blogname', '%TITLE%', 'yes'); 
-	# INSERT INTO `tpl_options` VALUES (4, 'blogdescription', '%SUBTITLE%', 'yes'); 
-	# INSERT INTO `tpl_options` VALUES (5, 'users_can_register', '0', 'yes'); 
-	# INSERT INTO `tpl_options` VALUES (6, 'admin_email', 'p.forret@brightfish.be', 'yes'); 
 
 	cat $MAILTXT | mail -s "WPCLONE: setup new blog $new_title - $new_url" $admin_email
 }
